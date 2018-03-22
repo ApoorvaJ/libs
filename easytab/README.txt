@@ -19,21 +19,17 @@ API USAGE
    parameters vary per OS, so look at the function declarations or examples
    below. Function returns EASYTAB_OK if initialization was successful.
 
-2) Call EasyTab_HandleEvent() in your message-handling code. The function
+2) Call easytab_handle_event() in your message-handling code. The function
    returns EASYTAB_OK if the message was a tablet message, and
    EASYTAB_EVENT_NOT_HANDLED otherwise.
 
-3) Call EasyTab_Unload() in your shutdown code.
+3) Call easytab_destroy() in your shutdown code.
 
-4) Once initialized, you can query tablet state using the EasyTab pointer.
-   e.g.:
+4) Once initialized, you can query tablet state using the following APIs:
 
-       EasyTab->PosX        // X position of the pen
-       EasyTab->PosY        // Y position of the pen
-       EasyTab->Pressure    // Pressure of the pen ranging from 0.0f to 1.0f
-
-   For more info, have a look at the EasyTabInfo struct below.
-
+       easytab_is_button_down()
+       easytab_get_pos();
+       easytab_get_pressure();
 
 * Add -lXi to compiler options to link XInput on Linux.
 
@@ -44,43 +40,35 @@ EXAMPLES
 
     int CALLBACK WinMain(...)
     {
-        HWND Window;
+        HWND win;
 
         ...
 
-        if (easytab_init(Window) != EASYTAB_OK)                                  // Load
-        {
+        if (easytab_init(win) != EASYTAB_OK) {
             OutputDebugStringA("Tablet init failed\n");
         }
 
         ...
 
-        // Once you've set up EasyTab loading, unloading and event handling,
-        // use the EasyTab variable at any point in your program to access
-        // the tablet state:
-        //    EasyTab->PosX
-        //    EasyTab->PosY
-        //    EasyTab->Pressure
-        // For more tablet information, look at the EasyTabInfo struct.
+        int x, y, range_x, range_y;
+        easytab_get_pos(&x, &y, &range_x, &range_y);
 
         ...
 
-        EasyTab_Unload();                                                      // Unload
+        easy_tab_destroy();
     }
 
     LRESULT CALLBACK WindowProc(
-        HWND Window,
-        UINT Message,
-        WPARAM WParam,
-        LPARAM LParam)
+        HWND win,
+        UINT msg,
+        WPARAM wp,
+        LPARAM lp)
     {
-        if (EasyTab_HandleEvent(Window, Message, LParam, WParam) == EASYTAB_OK) // Event
-        {
-            return true; // Tablet event handled
+        if (easytab_handle_event(win, msg, lp, wp) == EASYTAB_OK) {
+            return true; /* Tablet event handled */
         }
 
-        switch (Message)
-        {
+        switch (msg) {
             ...
         }
     }
@@ -90,47 +78,38 @@ EXAMPLES
 
     int main(...)
     {
-        Display* Disp;
-        Window   Win;
+        Display* disp;
+        Window   win;
 
         ...
 
-        if (easytab_init(Disp, Win) != EASYTAB_OK)                   // Load
-        {
+        if (easytab_init(disp, win) != EASYTAB_OK) {
             printf("Tablet init failed\n");
         }
 
         ...
 
-        while (XPending(Disp)) // Event loop
-        {
-            XEvent Event;
-            XNextEvent(XlibDisplay, &Event);
+        while (XPending(Disp)) {
+            XEvent event;
+            XNextEvent(XlibDisplay, &event);
 
-            if (EasyTab_HandleEvent(&Event) == EASYTAB_OK)          // Event
-            {
-                continue; // Tablet event handled
+            if (easytab_handle_event(&event) == EASYTAB_OK) {
+                continue; /* Tablet event handled */
             }
 
-            switch (Event.type)
-            {
+            switch (event.type) {
                 ...
             }
         }
 
         ...
 
-        // Once you've set up EasyTab loading, unloading and event handling,
-        // use the EasyTab variable at any point in your program to access
-        // the tablet state:
-        //    EasyTab->PosX
-        //    EasyTab->PosY
-        //    EasyTab->Pressure
-        // For more tablet information, look at the EasyTabInfo struct.
+        int x, y, range_x, range_y;
+        easytab_get_pos(&x, &y, &range_x, &range_y);
 
         ...
 
-        EasyTab_Unload();                                          // Unload
+        easytab_destroy();
     }
 
 ----------------------------------------------------------------------------
