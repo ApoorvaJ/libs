@@ -5,11 +5,15 @@
 */
 #ifdef __linux__
 
+#include "easytab.h"
+#include <assert.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "easytab.h"
+
+#define MAX_NUM_EVENT_CLASSES 32
 
 struct EasytabCtx {
     int32_t pos_x, pos_y;
@@ -20,14 +24,14 @@ struct EasytabCtx {
 
     XDevice* device;
     uint32_t motion_type;
-    XEventClass event_classes[1024];
+    XEventClass event_classes[MAX_NUM_EVENT_CLASSES];
     uint32_t num_event_classes;
     Display* disp;
 };
 
 struct EasytabCtx* ctx;
 
-enum EasyTabResult easytab_init(Display* disp, Window win)
+enum EasytabResult easytab_init(Display* disp, Window win)
 {
     int32_t i, j;
     int32_t num_devices = 0;
@@ -37,19 +41,22 @@ enum EasyTabResult easytab_init(Display* disp, Window win)
 
     ctx->disp = disp;
 
-    XDeviceInfoPtr Devices = (XDeviceInfoPtr)XListInputDevices(disp, &num_devices);
-    if (!Devices) { return EASYTAB_X11_ERROR; }
+    XDeviceInfoPtr devices = (XDeviceInfoPtr)XListInputDevices(disp, &num_devices);
+    if (!devices) {
+        ctx = NULL;
+        return EASYTAB_DEVICE_NOT_FOUND_ERROR;
+    }
 
     for (i = 0; i < num_devices; i++) {
-        if (!strstr(Devices[i].name, "stylus") &&
-            !strstr(Devices[i].name, "eraser")) {
+        if (!strstr(devices[i].name, "stylus") &&
+            !strstr(devices[i].name, "eraser")) {
             continue;
         }
 
-        ctx->device = XOpenDevice(disp, Devices[i].id);
-        XAnyClassPtr ClassPtr = Devices[i].inputclassinfo;
+        ctx->device = XOpenDevice(disp, devices[i].id);
+        XAnyClassPtr ClassPtr = devices[i].inputclassinfo;
 
-        for (j = 0; j < Devices[i].num_classes; j++) {
+        for (j = 0; j < devices[i].num_classes; j++) {
 #if defined(__cplusplus)
             switch (ClassPtr->c_class)
 #else
@@ -74,6 +81,7 @@ enum EasyTabResult easytab_init(Display* disp, Window win)
                     ctx->max_pressure = info->axes[2].max_value;
                 }
                 if (EventClass) {
+                    assert(ctx->num_event_classes < MAX_NUM_EVENT_CLASSES);
                     ctx->event_classes[ctx->num_event_classes] = EventClass;
                     ctx->num_event_classes++;
                 }
@@ -86,17 +94,21 @@ enum EasyTabResult easytab_init(Display* disp, Window win)
         XSelectExtensionEvent(disp, win, ctx->event_classes, ctx->num_event_classes);
     }
 
-    XFreeDeviceList(Devices);
+    XFreeDeviceList(devices);
 
     if (ctx->device) {
         return EASYTAB_OK;
     } else {
-        return EASYTAB_X11_ERROR;
+        ctx = NULL;
+        return EASYTAB_DEVICE_NOT_FOUND_ERROR;
     }
 }
 
-enum EasyTabResult easytab_handle_event(XEvent* event)
+enum EasytabResult easytab_handle_event(XEvent* event)
 {
+    if (!ctx) {
+        return EASYTAB_NOT_INITIALIZED_ERROR;
+    }
     if (event->type != ctx->motion_type) {
         return EASYTAB_EVENT_NOT_HANDLED;
     }
@@ -108,30 +120,36 @@ enum EasyTabResult easytab_handle_event(XEvent* event)
     return EASYTAB_OK;
 }
 
-unsigned char easytab_is_button_down(enum EasyTabButton button)
+enum EasytabResult easytab_get_pos(int* out_x, int* out_y)
 {
-    /* TODO: Implement */
-    return 0;
-}
+    if (!ctx) {
+        return EASYTAB_NOT_INITIALIZED_ERROR;
+    }
 
-
-void easytab_get_pos(int* out_x, int* out_y, int* out_range_x, int* out_range_y)
-{
     *out_x = ctx->pos_x;
     *out_y = ctx->pos_y;
-    *out_range_x = ctx->range_x;
-    *out_range_y = ctx->range_y;
+    return EASYTAB_OK;
 }
 
-float easytab_get_pressure()
+enum EasytabResult easytab_get_pressure(float* out_pressure)
 {
-    return ctx->pressure;
+    if (!ctx) {
+        return EASYTAB_NOT_INITIALIZED_ERROR;
+    }
+
+    *out_pressure = ctx->pressure;
+    return EASYTAB_OK;
 }
 
-void easytab_destroy()
+enum EasytabResult easytab_destroy()
 {
+    if (!ctx) {
+        return EASYTAB_NOT_INITIALIZED_ERROR;
+    }
+
     XCloseDevice(ctx->disp, ctx->device);
     free(ctx);
+    return EASYTAB_OK;
 }
 
-#endif // __linux__
+#endif /* __linux__ */

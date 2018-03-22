@@ -89,9 +89,9 @@ EXAMPLES
 
         ...
 
-        while (XPending(Disp)) {
+        while (XPending(disp)) {
             XEvent event;
-            XNextEvent(XlibDisplay, &event);
+            XNextEvent(disp, &event);
 
             if (easytab_handle_event(&event) == EASYTAB_OK) {
                 continue; /* Tablet event handled */
